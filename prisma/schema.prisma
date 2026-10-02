@@ -1,0 +1,494 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String             @id @default(cuid())
+  email         String             @unique
+  name          String?
+  cpf           String?            @unique
+  password      String?
+  role          Role               @default(CUSTOMER)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  accessLogs    AccessLog[]
+  Account       Account[]
+  customerLinks CustomerProvider[]
+  downloadLogs  DownloadLog[]
+  orders        Order[]
+  Session       Session[]
+  subscriptions Subscription[]
+  entitlements  UserEntitlement[]
+}
+
+model Category {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  products    ProductCategory[]
+}
+
+model Product {
+  id              String            @id @default(cuid())
+  name            String
+  slug            String            @unique
+  description     String?
+  status          ProductStatus     @default(DRAFT)
+  isPublic        Boolean           @default(false)
+  userId          String?
+  ref_number      Int               @unique @default(autoincrement())
+  mainImage       String?           @db.LongText
+  img             String?           @db.LongText
+  img2            String?           @db.LongText
+  images          Json?
+  arquivoPdf      String?           @db.LongText
+  arquivoPng      String?           @db.LongText
+  linkCanvas      String?           @db.LongText
+  calendar_blocks Json?
+  price           Decimal?
+  location        String?
+  beds            Int?
+  baths           Int?
+  sqft            Int?
+  garage          Int?
+  yearBuilt       Int?
+  propertyType    String?
+  propertyStatus  String?
+  amenities       Json?
+  coordinates     Json?
+  videos          Json?
+  phone           String?
+  ownerName       String?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  assets          DesignAsset[]
+  downloadLogs    DownloadLog[]
+  orderItems      OrderItem[]
+  plans           PlanProduct[]
+  categories      ProductCategory[]
+  entitlements    UserEntitlement[]
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+}
+
+model DesignAsset {
+  id         String    @id @default(cuid())
+  productId  String
+  label      String?
+  uri        String
+  type       AssetType
+  sizeBytes  BigInt?
+  width      Int?
+  height     Int?
+  checksum   String?
+  previewUri String?
+  createdAt  DateTime  @default(now())
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Plan {
+  id                   String         @id @default(cuid())
+  name                 String
+  slug                 String         @unique
+  description          String?
+  billingPeriod        BillingPeriod
+  priceCents           Int
+  currency             String         @default("BRL")
+  active               Boolean        @default(true)
+  trialDays            Int            @default(0)
+  maxDownloadsPerMonth Int?
+  maxDownloadsPerDay   Int?
+  metadata             Json?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  orderItems           OrderItem[]
+  products             PlanProduct[]
+  subscriptions        Subscription[]
+}
+
+model PlanProduct {
+  planId    String
+  productId String
+  plan      Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([planId, productId])
+  @@index([productId])
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  userId                 String
+  planId                 String
+  status                 SubscriptionStatus @default(TRIALING)
+  paymentMethod          PaymentMethod
+  provider               Provider
+  providerSubscriptionId String?
+  startAt                DateTime           @default(now())
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
+  metadata               Json?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  orders                 Order[]
+  plan                   Plan               @relation(fields: [planId], references: [id])
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entitlements           UserEntitlement[]
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+model Order {
+  id               String            @id @default(cuid())
+  userId           String
+  subscriptionId   String?
+  type             OrderType
+  status           OrderStatus       @default(PENDING)
+  totalAmountCents Int
+  currency         String            @default("BRL")
+  provider         Provider
+  providerOrderId  String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  invoices         Invoice[]
+  subscription     Subscription?     @relation(fields: [subscriptionId], references: [id])
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            OrderItem[]
+  entitlements     UserEntitlement[]
+
+  @@unique([provider, providerOrderId])
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([provider])
+}
+
+model OrderItem {
+  id              String        @id @default(cuid())
+  orderId         String
+  itemType        OrderItemType
+  planId          String?
+  productId       String?
+  quantity        Int           @default(1)
+  unitAmountCents Int
+  subtotalCents   Int
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  plan            Plan?         @relation(fields: [planId], references: [id])
+  product         Product?      @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([planId])
+  @@index([productId])
+}
+
+model Invoice {
+  id                String        @id @default(cuid())
+  orderId           String
+  provider          Provider
+  status            InvoiceStatus @default(OPEN)
+  dueDate           DateTime?
+  pdfUrl            String?
+  linhaDigitavel    String?
+  pixQrCode         String?
+  pixCopiaCola      String?
+  providerInvoiceId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payments          Payment[]
+
+  @@unique([provider, providerInvoiceId])
+  @@index([orderId])
+  @@index([status])
+  @@index([provider])
+}
+
+model Payment {
+  id                String         @id @default(cuid())
+  invoiceId         String
+  provider          Provider
+  method            PaymentMethod
+  status            PaymentStatus  @default(PENDING)
+  amountCents       Int
+  paidAt            DateTime?
+  providerPaymentId String?
+  providerRaw       Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  invoice           Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  webhookEvents     WebhookEvent[]
+
+  @@unique([provider, providerPaymentId])
+  @@index([invoiceId])
+  @@index([status])
+  @@index([provider])
+}
+
+model UserEntitlement {
+  id             String            @id @default(cuid())
+  userId         String
+  productId      String
+  source         EntitlementSource
+  subscriptionId String?
+  orderId        String?
+  expiresAt      DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  order          Order?            @relation(fields: [orderId], references: [id])
+  product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  subscription   Subscription?     @relation(fields: [subscriptionId], references: [id])
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, source, subscriptionId, orderId])
+  @@index([userId])
+  @@index([productId])
+  @@index([orderId], map: "UserEntitlement_orderId_fkey")
+  @@index([subscriptionId], map: "UserEntitlement_subscriptionId_fkey")
+}
+
+model DownloadLog {
+  id        String    @id @default(cuid())
+  userId    String
+  productId String
+  assetType AssetType
+  fileSize  BigInt?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model WebhookEvent {
+  id               String        @id @default(cuid())
+  provider         Provider
+  eventType        String
+  providerEventId  String?
+  status           WebhookStatus @default(RECEIVED)
+  signatureValid   Boolean       @default(false)
+  payloadHash      String?
+  headers          Json?
+  payload          Json
+  relatedPaymentId String?
+  processedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  relatedPayment   Payment?      @relation(fields: [relatedPaymentId], references: [id])
+
+  @@unique([provider, providerEventId])
+  @@index([provider])
+  @@index([status])
+  @@index([relatedPaymentId], map: "WebhookEvent_relatedPaymentId_fkey")
+}
+
+model CustomerProvider {
+  id                 String   @id @default(cuid())
+  userId             String
+  provider           Provider
+  providerCustomerId String
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerCustomerId])
+  @@index([userId, provider])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model AccessLog {
+  id          Int        @id @default(autoincrement())
+  userId      String?
+  ip          String
+  city        String?
+  browser     String     @default("Other")
+  deviceType  DeviceType
+  isIphone    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  deviceBrand String?
+  deviceModel String?
+  user        User?      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ContactMessage {
+  id         String   @id
+  name       String
+  message    String
+  phone      String?
+  propertyId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+
+  @@index([propertyId], map: "ContactMessage_propertyId_fkey")
+}
+
+model Supporters {
+  id     String  @id
+  userId String?
+  name   String
+  img    String? @db.LongText
+}
+
+enum Role {
+  ADMIN
+  DESIGNER
+  CUSTOMER
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AssetType {
+  IMAGE
+  PSD
+  AI
+  SVG
+  FONT
+  VIDEO
+  ZIP
+  OTHER
+  PNG
+}
+
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INACTIVE
+}
+
+enum PaymentMethod {
+  CARD
+  PIX
+  BOLETO
+}
+
+enum Provider {
+  MERCADO_PAGO
+  PAGBANK
+  OTHER
+}
+
+enum OrderType {
+  SUBSCRIPTION_INITIAL
+  RENEWAL
+  ONE_OFF
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELED
+  REFUNDED
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  VOID
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  REFUNDED
+  CHARGED_BACK
+}
+
+enum EntitlementSource {
+  SUBSCRIPTION
+  MANUAL
+  ORDER
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+enum OrderItemType {
+  PLAN
+  PRODUCT
+}
+
+enum DeviceType {
+  MOBILE
+  DESKTOP
+}

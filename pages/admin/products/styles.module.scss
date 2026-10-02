@@ -1,0 +1,42 @@
+.formGroup {
+    display: flex;
+    align-items: center;
+    width: 50%;
+    margin-bottom: 20px;
+
+    span {
+        margin-left: -20px;
+        border-start-start-radius: 0;
+        border-end-start-radius: 0;
+    }
+
+    @media only screen and (max-width: 768px) {
+        span {
+            margin-left: 0px;
+        }
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+.inputGroup {
+    display: flex;
+    justify-content: space-between;
+
+    @media only screen and (max-width: 768px) {
+        flex-direction: column-reverse;
+        width: 100%;
+        gap: 30px;
+
+        button {
+            width: 100%;
+            margin-inline-start: 0px !important;
+        }
+    }
+}
+
+.img {
+    object-fit: cover !important;
+    width: 100% !important;
+    height: 300px !important;
+}
